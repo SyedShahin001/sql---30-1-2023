@@ -1,0 +1,654 @@
+BACK END
+-------------------------------------------------------------------
+1)asp .net core web api
+2)package: ms.entityFrameworkCore.Tools
+                                  SqlServer
+3)connection string
+        "ConnectionStrings":{"Dbconnect":"Server=servername;Database=databasename;integrated security=true;Encrypt=false"}
+4)program.cs
+builder.Services.AddCors();
+app.UseCors(options =>
+{
+options.AllowAnyOrigin();
+options.AllowAnyMethod();
+options.AllowAnyHeader();
+});
+builder.Services.AddDbContext<LibraryContext>(item => item.UseSqlServer(builder.Configuration.GetConnectionString("Dbconnect")));
+
+
+5)model classes
+6)dbcontext class :
+using Microsoft.EntityFrameworkCore;
+
+namespace Library.Models
+{
+    public class LibraryContext : DbContext
+    {
+        public LibraryContext(DbContextOptions<LibraryContext> options) : base(options)
+        {
+
+        }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<Book> Books { get; set; }
+        public DbSet<Borrow> Borrows { get; set; }
+        public DbSet<Category> Categories { get; set; }
+        public DbSet<Fine> Fines { get; set; }
+    }
+}
+
+7)Controllers
+login and register
+
+        //Register page
+        [HttpPost("Register")]
+        public async Task<ActionResult<User>> Register(User user)
+        {
+            var newUser = new User
+            {
+                UserName = user.UserName,
+                UserPassword = user.UserPassword,
+                UserEmail = user.UserEmail,
+                UserPhone = user.UserPhone,
+                
+            };
+
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+
+
+            return CreatedAtAction("GetUser", new { id = newUser.UserId }, newUser);
+        }
+
+
+        //Login Page
+
+        [HttpPost("Login")]
+        public async Task<ActionResult<User>> Login(User loginDto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.UserEmail == loginDto.UserEmail && u.UserPassword == loginDto.UserPassword);
+
+            if (user == null)
+            {
+                return Unauthorized("Invalid userEmail or password");
+            }
+
+
+            return user;
+        }
+    }
+
+REACT FRONT END
+------------------------------------------------
+
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './Login.css';
+ 
+function Login() {
+  const [userEmail, setEmailAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginMessage, setLoginMessage] = useState('');
+  const navigate = useNavigate();
+ 
+  const handleLogin = async () => {
+    if (!userEmail || !password) {
+      setLoginMessage('Please fill in both email and password');
+      return;
+    }
+ 
+    try {
+      const response = await fetch('https://localhost:7213/api/Users', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+ 
+      if (!response.ok) {
+        throw new Error('Error fetching user data');
+      }
+ 
+      const allUserData = await response.json();
+      const user = allUserData.find((user) => user.userEmail=== userEmail);
+      console.log(user);
+      console.log(password);
+ 
+      if (user.userPassword === password) {
+        // Successful login
+        navigate('/Home');
+        console.log('Login');
+      } else {
+        setLoginMessage('Invalid email or password');
+      }
+    } catch (error) {
+      console.error('Error during login:', error);
+      setLoginMessage('An error occurred while logging in');
+    }
+  };
+ 
+  const handleRegisterClick = () => {
+    navigate('/Registration'); // Navigate to the registration page
+  };
+ 
+  return (
+    <div className="login-container">
+      <div className="login-column">
+        <h2>Login</h2>
+        <div>
+          <input
+            type="email"
+            placeholder="EmailAddress"
+            value={userEmail}
+            onChange={(e) => setEmailAddress(e.target.value)}
+          />
+        </div>
+        <div>
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div className="button-container">
+          <button onClick={handleLogin}>Login</button>
+          </div>
+          <div className="button-container">
+          <button onClick={handleRegisterClick}>Register</button>
+        </div>
+        <p className="error-message">{loginMessage}</p>
+      </div>
+    </div>
+  );
+}
+ 
+export default Login;
+ 
+ 
+/* Login.css */
+ 
+.login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f4f4f4; /* Background color for the entire page */
+  }
+ 
+  .login-column {
+    text-align: center;
+    width: 300px;
+    padding: 20px;
+    background-color: #ffffff; /* Background color for the login form */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow for a subtle lift */
+  }
+ 
+  .login-column h2 {
+    color: #333; /* Heading color */
+  }
+ 
+  .login-column input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    box-sizing: border-box;
+  }
+ 
+  .login-column button {
+    width: 100%;
+    padding: 10px;
+    background-color: #4caf50; /* Green button color */
+    color: #fff; /* Text color */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+ 
+  .login-column button:hover {
+    background-color: #45a049; /* Darker green on hover */
+  }
+ 
+  .error-message {
+    color: red;
+    margin-top: 10px;
+  }
+----------------------------------------------------------
+// Registration.js
+ 
+import React, { useState } from 'react';
+import {Link} from 'react-router-dom';
+import './Registration.css';
+ 
+const Registration = () => {
+  const [formData, setFormData] = useState({
+    username: '',
+    useremail: '',  
+    userpassword: '',  
+    userphone: '',  // Change usermobile to userphone
+  });
+ 
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+ 
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+ 
+  const validateEmail = (email) => {
+    // Simple email validation check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+ 
+  const validatePhone = (phone) => {
+    // Simple phone number validation check (10 digits)
+    const phoneRegex = /^\d{10}$/;
+    return phoneRegex.test(phone);
+  };
+ 
+  const checkDuplicateUser = async () => {
+    try {
+      const response = await fetch(`https://localhost:7213/api/Users?email=${formData.useremail}&phone=${formData.userphone}`);
+      const data = await response.json();
+      console.log('Duplicate Check Response:', response);
+      console.log('Duplicate Check Data:', data);
+      return data.length > 0;
+    } catch (error) {
+      console.error('Error checking duplicate user:', error);
+      return false;
+    }
+  };
+ 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+ 
+    // Validation checks
+    if (!validateEmail(formData.useremail)) {
+      setErrorMessage('Incorrect email format. Please enter a valid email.');
+      return;
+    }
+ 
+    if (!validatePhone(formData.userphone)) {
+      setErrorMessage('Phone number must be 10 digits.');
+      return;
+    }
+ 
+    // Check for duplicate user
+    const isDuplicateUser = await checkDuplicateUser();
+    console.log('Is Duplicate User:', isDuplicateUser);
+ 
+    try {
+      console.log(formData);
+ 
+      const response = await fetch('https://localhost:7213/api/Users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+ 
+      if (response.ok) {
+        setSuccessMessage('Registration successful!');
+        setErrorMessage('');
+      } else {
+        setErrorMessage('Registration failed. Please check your input and try again.');
+        setSuccessMessage('');
+      }
+    } catch (error) {
+      setSuccessMessage('');
+      setErrorMessage('An error occurred while processing your request.');
+    }
+  };
+ 
+  return (
+ 
+      <div className="registration-container">
+        <div className="registration-form">
+          <h2>Registration</h2>
+          <form onSubmit={handleSubmit}>
+        <label>
+          Username:
+          <input type="text" name="username" value={formData.username} onChange={handleChange} required />
+        </label>
+        <br />
+        <label>
+          Email:
+          <input type="email" name="useremail" value={formData.useremail} onChange={handleChange} required />
+        </label>
+        <br />
+        <label>
+          Password:
+          <input type="password" name="userpassword" value={formData.userpassword} onChange={handleChange} required />
+        </label>
+        <br />
+        <label>
+          Phone:
+          <input type="tel" name="userphone" value={formData.userphone} onChange={handleChange} required />
+        </label>
+        <br />
+        <button type="submit">Register</button>
+        </form>
+        {successMessage && <p className="registration-message" style={{ color: 'green' }}>{successMessage}</p>}
+        {errorMessage && <p className="registration-message" style={{ color: 'red' }}>{errorMessage}</p>}
+        {/* Link to navigate to the login page */}
+        <p className="login-link">Already have an account? <Link to="/login">Login</Link></p>
+      </div>
+    </div>
+   
+  );
+};
+ 
+export default Registration;
+ 
+ 
+/* Registration.css */
+ 
+.registration-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f4f4f4; /* Background color for the entire page */
+  }
+ 
+  .registration-form {
+    text-align: center;
+    width: 300px;
+    padding: 20px;
+    background-color: #ffffff; /* Background color for the registration form */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow for a subtle lift */
+  }
+ 
+  .registration-form h2 {
+    color: #333; /* Heading color */
+  }
+ 
+  .registration-form input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    box-sizing: border-box;
+  }
+ 
+  .registration-form button {
+    width: 100%;
+    padding: 10px;
+    background-color: #4caf50; /* Green button color */
+    color: #fff; /* Text color */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+ 
+  .registration-form button:hover {
+    background-color: #45a049; /* Darker green on hover */
+  }
+ 
+  .registration-message {
+    margin-top: 10px;
+  }
+ 
+  .login-link {
+    margin-top: 10px;
+  }
+ --------------------------------------------------
+import React from 'react';
+import './Navbar.css'; // Import the styles
+import 'bootstrap/dist/css/bootstrap.min.css';
+ 
+const Navbar = () => {
+  return (
+    <nav className="navbar">
+      <ul>
+        {/* Display "Library" in bold on the left side */}
+        <li className="navbar-brand">
+          Library
+        </li>
+        <li>
+          <a href="/home" className="nav-link">Home</a>
+        </li>
+        <li>
+          <a href="/about" className="nav-link">About</a>
+        </li>
+        <li>
+          <a href="/contact" className="nav-link">Contact</a>
+        </li>
+        <li>
+          <a href="/Logout" className="nav-link">Logout</a>
+        </li>
+      </ul>
+    </nav>
+  );
+};
+ 
+export default Navbar;
+----------------------------------------------------
+
+import logo from './logo.svg';
+import './App.css';
+import Login from './Login';
+import Navbar from './Navbar';
+import Home from './Home';
+import Logout from './Logout';
+import About from './About';
+ 
+ 
+import Registration from './Registration';
+import {BrowserRouter, Router, Routes, Route} from 'react-router-dom';
+function App() {
+  return (
+    <BrowserRouter>
+    <Routes>
+    <Route path="Registration" element={<Registration />}></Route>
+    <Route path="Login" element={<Login />}></Route>
+    <Route path="Navbar" element={<Navbar />}></Route>
+    <Route path="Home" element={<Home />}></Route>
+    <Route path="Logout" element={<Logout />}></Route>
+    <Route path="About" element={<About />}></Route>
+    </Routes>
+   
+    </BrowserRouter>
+   
+ 
+  );
+}
+ 
+export default App;
+--------------------------------------------------------------------
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Link,useNavigate } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import Layout from './Layout';
+ 
+function Books() {
+  const [books, setBooks] = useState([]);
+  const [selectedBook, setSelectedBook] = useState(null);
+  let navigate = useNavigate();
+  useEffect(() => {
+    // Fetch all books when the component mounts
+    fetchBooks();
+  }, []);
+ 
+  const fetchBooks = async () => {
+    try {
+      const response = await axios.get('https://localhost:7111/api/Books');
+      setBooks(response.data);
+    } catch (error) {
+      console.error('Error fetching books:', error);
+    }
+  };
+  function handleAddBook() {
+    // Use the navigate function to navigate to the 'AddBookDetails' component
+    navigate('/AddBookDetails');
+  }
+ 
+  const handleUpdateClick = (book) => {
+    // Set the selected book for update
+    setSelectedBook(book);
+  };
+ 
+  const handleUpdateSubmit = async (updatedBook) => {
+    try {
+      // Send the updated book to the server
+      await axios.put(`https://localhost:7111/api/Books/${updatedBook.bookId}`, updatedBook);
+ 
+      // Fetch updated book list
+      fetchBooks();
+ 
+      // Reset the selected book
+      setSelectedBook(null);
+    } catch (error) {
+      console.error('Error updating book:', error);
+    }
+  };
+  const handleDeleteBook = async (id) => {
+    try {
+      // Send the delete request to the server
+      await axios.delete(`https://localhost:7111/api/Books/${id}`);
+ 
+      // Fetch updated book list
+      fetchBooks();
+    } catch (error) {
+      console.error('Error deleting book:', error);
+    }
+  };
+ 
+  return (
+    <div>
+      <Layout/>
+   
+     
+    <div className="container mt-5">
+      <h2 className="text-center mb-4">All Books</h2>
+      <table className="table table-striped">
+        <thead>
+          <tr>
+            <th>ISBN</th>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Genre</th>
+            <th>Publish Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {books.map((book) => (
+            <tr key={book.bookId}>
+              <td>{book.isbn}</td>
+              <td>{book.title}</td>
+              <td>{book.author}</td>
+              <td>{book.genre}</td>
+              <td>{book.publishDate}</td>
+              <td>
+                <button
+                  onClick={() => handleUpdateClick(book)}
+                  className="btn btn-primary btn-sm"
+                >
+                  Update
+                </button>
+                <button onClick={handleAddBook} className="btn btn-success btn-sm">
+        Add Book
+      </button>
+         
+            <button onClick={() => handleDeleteBook(book.bookId)} className="btn btn-danger btn-sm">
+           Delete
+            </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+ 
+      {selectedBook && (
+        <div className="mt-4">
+          <h3 className="mb-3">Update Book</h3>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleUpdateSubmit(selectedBook);
+            }}
+          >
+            <div className="mb-3">
+              <label className="form-label">ISBN:</label>
+              <input
+                type="text"
+                className="form-control"
+                value={selectedBook.isbn}
+                onChange={(e) =>
+                  setSelectedBook({ ...selectedBook, isbn: e.target.value })
+                }
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Title:</label>
+              <input
+                type="text"
+                className="form-control"
+                value={selectedBook.title}
+                onChange={(e) =>
+                  setSelectedBook({ ...selectedBook, title: e.target.value })
+                }
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Author:</label>
+              <input
+                type="text"
+                className="form-control"
+                value={selectedBook.author}
+                onChange={(e) =>
+                  setSelectedBook({ ...selectedBook, author: e.target.value })
+                }
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Genre:</label>
+              <input
+                type="text"
+                className="form-control"
+                value={selectedBook.genre}
+                onChange={(e) =>
+                  setSelectedBook({ ...selectedBook, genre: e.target.value })
+                }
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Publish Date:</label>
+              <input
+                type="date"
+                className="form-control"
+                value={selectedBook.publishDate}
+                onChange={(e) =>
+                  setSelectedBook({
+                    ...selectedBook,
+                    publishDate: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <button type="submit" className="btn btn-success">
+              Update
+         </button>
+          </form>
+        </div>
+      )}
+    </div>
+    </div>
+  );
+}
+ 
+ 
+ 
+export default Books;
